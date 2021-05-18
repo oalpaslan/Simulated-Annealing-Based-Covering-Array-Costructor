@@ -23,28 +23,11 @@
       <values>
         <value>0</value>
         <value>1</value>
-        <value>2</value>
       </values>
       <basechoices />
       <invalidValues />
     </Parameter>
-    <Parameter id="3" name="o4" type="0">
-      <values>
-        <value>0</value>
-        <value>1</value>
-        <value>2</value>
-      </values>
-      <basechoices />
-      <invalidValues />
-    </Parameter>
-    <Parameter id="4" name="o5" type="0">
-      <values>
-        <value>0</value>
-        <value>1</value>
-      </values>
-      <basechoices />
-      <invalidValues />
-    </Parameter>
+
   </Parameters>
   <OutputParameters />
   <Relations />
