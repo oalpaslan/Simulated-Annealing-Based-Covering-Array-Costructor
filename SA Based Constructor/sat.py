@@ -172,7 +172,6 @@ while (running > 0):
         # if they are, reduce the covariance size and try again
         c_size = c_size - 1
         working_test = test
-        print("wowow")
     else:
         # else, the iterations if we have a working test
         if (working_test.shape[0] != 0):
@@ -212,7 +211,7 @@ c_array = np.unique(best, axis=0)
 if c_array.size < first_array.size:
     print("Final missing tuple count: ", count_miss(best, t, value_count))
     print(c_array)
-    print("Covering array size: ", c_array.shape[0], c_array.shape[1],
+    print("First covering array size: ", c_array.shape[0], c_array.shape[1],
           " with the total of ", c_array.shape[0] * c_array.shape[1], " indices.")
 else:
     print(first_array)
