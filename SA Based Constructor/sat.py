@@ -67,9 +67,13 @@ def count_miss(data, t, val_cat):
     # combinations(): itertools module, creates an array of all the given t combinations of the values
     for p in combinations(np.arange(data.shape[1]), t):
         # check if every possible interaction is represented
-        if (np.unique(data[:, p], axis=0).shape[0] < val_cat):
+        mult = 1
+        for i in range(0, t):
+            # print(len(mydict[str(p[i])]))
+            mult *= len(mydict[str(p[i])])
+        if (np.unique(data[:, p], axis=0).shape[0] < mult):
             # if not, return false
-            missing_tuples = val_cat - np.unique(data[:, p], axis=0).shape[0]
+            missing_tuples = mult - np.unique(data[:, p], axis=0).shape[0]
             return missing_tuples
     # if we made it through the whole for loop, return true
     return missing_tuples
@@ -83,15 +87,13 @@ def check_interactions(data, mydict, t,):
         mult = 1
         for i in range(0, t):
             # print(len(mydict[str(p[i])]))
-            mult *= mydict[str(p[i])]
+            mult *= len(mydict[str(p[i])])
 
         # t VALUE SAYISI ÇARPILARAK BU DEĞER BULUNABİLİR
         if (unique(data[:, p], axis=0).shape[0] < mult):
             # if not, return false
-            print("P: ", unique(data[:, p], axis=0).shape[0])
             return False
     # if we made it through the whole for loop, return true
-    print("yesmesmess")
     return True
 
 
@@ -116,6 +118,7 @@ def neighboring_state_gen(data, no_opts, mydict, c_size):
         c_col = random.randint(0, no_opts-1)
         c_c_row = len(mydict[str(c_col)])
         neighbor[c_row, c_col] = random.randint(0, c_c_row-1)
+        # print("Data: ", data, "Neighbor: ", neighbor)
     else:
         neighbor = create_test_array(data, c_size)
     return neighbor
@@ -150,7 +153,7 @@ no_opts = len(mydict)
 # no_vals = value_count
 starting_temp = 1
 stopping_temp = 0.000001
-running = 1000
+running = 100
 
 # arr = create_array(no_opts, no_vals)
 c_size = find_max_size(t, no_opts, value_count)
