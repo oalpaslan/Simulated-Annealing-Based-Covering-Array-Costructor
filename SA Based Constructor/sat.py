@@ -8,6 +8,7 @@ Original file is located at
 """
 
 import sys
+from types import new_class
 import numpy as np
 from numpy import asarray
 from numpy import unique
@@ -61,7 +62,7 @@ def create_test_array(array, size):
     return array[x, :]
 
 
-def count_miss(data, t, val_cat):
+def count_miss(data, t, mydict):
  # print(np.arange(data.shape[1]))
     missing_tuples = 0
     # combinations(): itertools module, creates an array of all the given t combinations of the values
@@ -69,8 +70,7 @@ def count_miss(data, t, val_cat):
         # check if every possible interaction is represented
         mult = 1
         for i in range(0, t):
-            # print(len(mydict[str(p[i])]))
-            mult *= len(mydict[str(p[i])])
+            mult *= len(mydict[('o' + str(p[i]+1)), str(p[i])])
         if (np.unique(data[:, p], axis=0).shape[0] < mult):
             # if not, return false
             missing_tuples = mult - np.unique(data[:, p], axis=0).shape[0]
@@ -79,18 +79,32 @@ def count_miss(data, t, val_cat):
     return missing_tuples
 
 
-def check_interactions(data, mydict, t,):
+def check_constraints(data, mydict, constraints):
+    for x in constraints:
+        colmns = []
+        for y in mydict.keys():
+            for opt in constraints[x]:
+                if opt[0] == y[0]:
+                    colmns.append([data[:, x]])
+                for z in colmns:
+                    for k in range(0, len(colmns[z])):
+                        if opt[1] == colmns[z][k]:
+
+
+def check_interactions(data, mydict, constraints, t):
 
     # combinations(): itertools module, creates an array of all the given t combinations of the values
     for p in combinations(np.arange(data.shape[1]), t):
         # check if every possible interaction is represented
+
         mult = 1
         for i in range(0, t):
             # print(len(mydict[str(p[i])]))
-            mult *= len(mydict[str(p[i])])
+            mult *= len(mydict[('o' + str(p[i]+1)), str(p[i])])
 
-        # t VALUE SAYISI ÇARPILARAK BU DEĞER BULUNABİLİR
-        if (unique(data[:, p], axis=0).shape[0] < mult):
+            # t VALUE SAYISI ÇARPILARAK BU DEĞER BULUNABİLİR
+        # if -> or check_constraints(data, mydict, constraints) == False
+        if (unique(data[:, p], axis=0).shape[0] < mult or check_constraints(data, mydict, constraints) == False):
             # if not, return false
             return False
     # if we made it through the whole for loop, return true
@@ -116,7 +130,7 @@ def neighboring_state_gen(data, no_opts, mydict, c_size):
         neighbor = data
         c_row = random.randint(0, data.shape[0]-1)
         c_col = random.randint(0, no_opts-1)
-        c_c_row = len(mydict[str(c_col)])
+        c_c_row = len(mydict[('o'+str(c_col+1)), str(c_col)])
         neighbor[c_row, c_col] = random.randint(0, c_c_row-1)
         # print("Data: ", data, "Neighbor: ", neighbor)
     else:
@@ -126,18 +140,44 @@ def neighboring_state_gen(data, no_opts, mydict, c_size):
 
 doc = xml.dom.minidom.parse(input('Please enter the name of the XML file: '))
 mydict = {}
+constraints = {}
+cns_arr = []
+ptr = 0
 for node in doc.getElementsByTagName('Parameter'):
     if node.hasChildNodes():
-        id = node.getAttribute('id')
+        (name, id) = (node.getAttribute('name'), node.getAttribute('id'))
         values = node.getElementsByTagName('value')
         x = []
         for value in values:
             x += value.firstChild.nodeValue
-        mydict[id] = x
-    else:
-        txt = node.getAttribute('text')
-        print(txt)
-print(mydict)
+        mydict[name, id] = x
+for node2 in doc.getElementsByTagName('Constraint'):
+    c_text = node2.getAttribute('text')
+    constraints[ptr] = c_text
+    ptr += 1
+for cns in constraints:
+    cns_arr.append(constraints[cns].split('=>'))
+print(constraints[0].split('=>')[0])
+cns_arr = np.asarray(cns_arr)
+arranged_cns = {}
+count = 0
+for x in cns_arr:
+    for y in x:
+        if '!=' in y:
+            sp_y = y.split('!=')
+            sp_y.append('!')
+            if count in arranged_cns.keys():
+                arranged_cns[count].append(sp_y)
+            else:
+                arranged_cns[count] = [sp_y]
+        elif '=' in y:
+            spi_y = y.split('=')
+            if count in arranged_cns.keys():
+                arranged_cns[count].append(spi_y)
+            else:
+                arranged_cns[count] = [spi_y]
+    count += 1
+print(arranged_cns)
 arr = create_array((mydict))
 print(arr)
 t = int(input('Coverage strength(t): '))
@@ -148,10 +188,10 @@ value_count = 1
 for x in mydict.values():
     value_count *= len(x)
 print(value_count)
-print(len(mydict))
+print(mydict['o1', '0'])
 no_opts = len(mydict)
 # no_vals = value_count
-starting_temp = 1
+starting_temp = 10
 stopping_temp = 0.000001
 running = 100
 
@@ -160,22 +200,22 @@ c_size = find_max_size(t, no_opts, value_count)
 print(c_size)
 working_test = test = create_test_array(arr, c_size)
 print("Test array: ", working_test)
-
-miss = count_miss(test, t, value_count)
-if (miss == 0):
-    best = test
-    first_array = best
-while (running > 0):
-    test = create_test_array(arr, c_size)
-    # check if all interactions are represented in this test array
-    if (check_interactions(test, mydict, t)):
-        # if they are, reduce the covariance size and try again
-        c_size = c_size - 1
-        working_test = test
-    else:
-        # else, the iterations if we have a working test
-        if (working_test.shape[0] != 0):
-            running = running - 1
+if check_interactions(working_test, mydict, arranged_cns, t):
+    miss = count_miss(test, t, mydict)
+    if (miss == 0):
+        best = test
+        first_array = best
+# while (running > 0):
+#     test = create_test_array(arr, c_size)
+#     # check if all interactions are represented in this test array
+#     if (check_interactions(test, arranged_cns, mydict, t)):
+#         # if they are, reduce the covariance size and try again
+#         c_size = c_size - 1
+#         working_test = test
+#     else:
+#         # else, the iterations if we have a working test
+#         if (working_test.shape[0] != 0):
+#             running = running - 1
 first_array = best = working_test
 print("First array:\n", working_test)
 print("Covering array size: ", working_test.shape[0], working_test.shape[1],
@@ -187,7 +227,7 @@ temp = starting_temp
 start = time.time()
 while temp > stopping_temp:
     working_test = create_test_array(working_test, c_size)
-    miss = count_miss(working_test, t, value_count)
+    miss = count_miss(working_test, t, mydict)
     if (miss == 0):
         best = working_test
         c_size -= 1
@@ -195,11 +235,11 @@ while temp > stopping_temp:
         continue
     neighbor = neighboring_state_gen(
         working_test, no_opts, mydict, c_size)
-    t_miss_n = count_miss(neighbor, t, value_count)
+    t_miss_n = count_miss(neighbor, t, mydict)
     diff_miss = t_miss_n - miss
     if working_test.shape[0] == neighbor.shape[0] or (diff_miss < 0 or (random.randint(0, 1) < (math.e)**((-(scipy.constants.k))*diff_miss/temp))):
         working_test = neighbor
-        if count_miss(working_test, t, value_count) == 0:
+        if count_miss(working_test, t, mydict) == 0:
             best = working_test
             c_size -= 1
             temp = starting_temp
@@ -209,7 +249,7 @@ stop = time.time()
 print(stop-start)
 c_array = np.unique(best, axis=0)
 if c_array.size < first_array.size:
-    print("Final missing tuple count: ", count_miss(best, t, value_count))
+    print("Final missing tuple count: ", count_miss(best, t, mydict))
     print(c_array)
     print("First covering array size: ", c_array.shape[0], c_array.shape[1],
           " with the total of ", c_array.shape[0] * c_array.shape[1], " indices.")
