@@ -23,33 +23,16 @@
       <values>
         <value>0</value>
         <value>1</value>
-        <value>2</value>
       </values>
       <basechoices />
       <invalidValues />
     </Parameter>
-    <Parameter id="3" name="o4" type="0">
-      <values>
-        <value>0</value>
-        <value>1</value>
-        <value>2</value>
-      </values>
-      <basechoices />
-      <invalidValues />
-    </Parameter>
-    <Parameter id="4" name="o5" type="0">
-      <values>
-        <value>0</value>
-        <value>1</value>
-      </values>
-      <basechoices />
-      <invalidValues />
-    </Parameter>
+
   </Parameters>
   <OutputParameters />
   <Relations />
   <Constraints>
-    <Constraint text="o1=0 =&gt; o2!=1">
+    <Constraint text="o1=0 =&gt; o2=1">
       <Parameters>
         <Parameter name="o1" />
         <Parameter name="o2" />

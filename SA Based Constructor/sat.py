@@ -21,6 +21,7 @@ import random
 import math
 import xml.etree.ElementTree as ET
 from numpy.core.defchararray import _to_string_or_unicode_array
+from numpy.core.getlimits import _register_type
 import scipy
 from scipy.constants import k
 from scipy import special
@@ -45,11 +46,20 @@ def bino_coef(n, k):  # Binomial coefficient function
         return 0
 
 
-def create_array(mydict):
+def create_array(mydict, constraints):
     arr = []
+    prod = my_product(mydict)
     # Takes the cartesian product of options with values. This will create a configuration settings list.
-    for i in my_product(mydict):
-        arr.append(list(i.values()))
+    for i in prod:
+        first_arr = np.array([])
+        for val in i.values():
+            print("i: ", i)
+            print("val: ", val)
+            first_arr = np.append(first_arr, val)
+        print("First arr: ", first_arr)
+        if check_constraints(first_arr, mydict, constraints):
+            arr.append(list(i.values()))
+
     return asarray(arr)  # This will return the arr with the numpy array form.
 
 
@@ -81,14 +91,51 @@ def count_miss(data, t, mydict):
 
 def check_constraints(data, mydict, constraints):
     for x in constraints:
-        colmns = []
-        for y in mydict.keys():
-            for opt in constraints[x]:
-                if opt[0] == y[0]:
-                    colmns.append([data[:, x]])
-                for z in colmns:
-                    for k in range(0, len(colmns[z])):
-                        if opt[1] == colmns[z][k]:
+        ind = np.array([])
+        inv_ind = np.array([])
+        for opt in constraints[x]:
+            i = 0  # For saving the column orders to be keys of conc_dict
+            for y in mydict.keys():
+                print("OPT", opt)
+                if len(opt) == 2:  # If the configuration in constraint is an equality condition
+                    conc_dict = np.array([])
+                    not_conc = np.array([])
+                    print("Y0:", y[0])
+                    print("Y1:", y[1])
+                    print("Data0: ", data)
+                    if opt[0] == y[0]:
+                        print("Data: ", data[int(y[1])])
+                        ind = np.append(ind, [data[int(y[1])]])
+            print("Cols: ", ind)
+            inv_ind = np.append(inv_ind, opt[1])
+        if ind[0] == inv_ind[0]:
+            if ind[1] != inv_ind[1]:
+                return False
+        # if len(ind) == 2:
+        #     for k in range(0, len(ind)):
+
+        #         f_row = int(ind[0])
+        #         r_opt = int(opt[1])
+        #         print("Z[k]:", f_row)
+        #         print("OPT[1]:", r_opt)
+        #         if f_row == opt[1] and:
+        #             print("çalıştı")
+        #             conc_dict = np.append(conc_dict, k)
+        #     for kk in range(0, len(colmns)):
+        #         f_row1 = int(colmns[1])
+        #         r_opt1 = int(opt[1])
+        #         print("Z[kk]:", f_row1)
+        #         print("OPT[1]:", r_opt1)
+        #         if r_opt1 != f_row1:
+        #             not_conc = np.append(not_conc, kk)
+        #     print("Bakalım", conc_dict)
+        #     # !!! NEDEN DUPLICATE ÇIKMIYOR? ROWLARI KAYDETMEDE HATA VAR DÜZELT!!! ASLA TRUE OLMUYOR
+        #     for conc in conc_dict:
+        #         if conc in not_conc:
+        #             return False
+        #         else:
+        #             return True
+    return True
 
 
 def check_interactions(data, mydict, constraints, t):
@@ -124,8 +171,7 @@ def size_decrease(data):  # Randomly deletes a row in generated array to decreas
 
 
 # Neighboring state generation function which gets the data and alters an option setting value
-def neighboring_state_gen(data, no_opts, mydict, c_size):
-
+def neighboring_state_gen(data, no_opts, mydict, constraints):
     if data.shape[0] == c_size:
         neighbor = data
         c_row = random.randint(0, data.shape[0]-1)
@@ -156,7 +202,7 @@ for node2 in doc.getElementsByTagName('Constraint'):
     constraints[ptr] = c_text
     ptr += 1
 for cns in constraints:
-    cns_arr.append(constraints[cns].split('=>'))
+    cns_arr.append(constraints[cns].split(' => '))
 print(constraints[0].split('=>')[0])
 cns_arr = np.asarray(cns_arr)
 arranged_cns = {}
@@ -178,7 +224,7 @@ for x in cns_arr:
                 arranged_cns[count] = [spi_y]
     count += 1
 print(arranged_cns)
-arr = create_array((mydict))
+arr = create_array(mydict, arranged_cns)
 print(arr)
 t = int(input('Coverage strength(t): '))
 # no_opts = int(input('Number of options: '))
@@ -198,7 +244,12 @@ running = 100
 # arr = create_array(no_opts, no_vals)
 c_size = find_max_size(t, no_opts, value_count)
 print(c_size)
-working_test = test = create_test_array(arr, c_size)
+test = create_test_array(arr, c_size)
+while not check_constraints(test, mydict, arranged_cns):
+    test = create_test_array(arr, c_size)
+working_test = test
+# while check_constraints(working_test, mydict, arranged_cns):
+#     working_test = create_test_array(working_test, c_size)
 print("Test array: ", working_test)
 if check_interactions(working_test, mydict, arranged_cns, t):
     miss = count_miss(test, t, mydict)
@@ -233,11 +284,12 @@ while temp > stopping_temp:
         c_size -= 1
         temp = starting_temp
         continue
+    print("heyheyhey", check_constraints(working_test, mydict, arranged_cns))
     neighbor = neighboring_state_gen(
-        working_test, no_opts, mydict, c_size)
+        working_test, no_opts, mydict, arranged_cns)
     t_miss_n = count_miss(neighbor, t, mydict)
     diff_miss = t_miss_n - miss
-    if working_test.shape[0] == neighbor.shape[0] or (diff_miss < 0 or (random.randint(0, 1) < (math.e)**((-(scipy.constants.k))*diff_miss/temp))):
+    if check_constraints(neighbor, mydict, arranged_cns) == True and (working_test.shape[0] == neighbor.shape[0] or (diff_miss < 0 or (random.randint(0, 1) < (math.e)**((-(scipy.constants.k))*diff_miss/temp)))):
         working_test = neighbor
         if count_miss(working_test, t, mydict) == 0:
             best = working_test
@@ -249,6 +301,7 @@ stop = time.time()
 print(stop-start)
 c_array = np.unique(best, axis=0)
 if c_array.size < first_array.size:
+    print(check_constraints(c_array, mydict, arranged_cns))
     print("Final missing tuple count: ", count_miss(best, t, mydict))
     print(c_array)
     print("First covering array size: ", c_array.shape[0], c_array.shape[1],
@@ -256,6 +309,6 @@ if c_array.size < first_array.size:
 else:
     print(first_array)
     print("Final missing tuple count: ",
-          count_miss(first_array, t, value_count))
+          count_miss(first_array, t, mydict))
     print("Covering array size: ", first_array.shape[0], first_array.shape[1],
           " with the total of ", first_array.shape[0] * first_array.shape[1], " indices.")
