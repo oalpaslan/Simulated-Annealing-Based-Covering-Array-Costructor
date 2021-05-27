@@ -7,6 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1pdrTcaTZPs-m38Li-FN6Omp8aHVymcX3
 """
 
+from operator import ne
 import sys
 from types import new_class
 import numpy as np
@@ -53,10 +54,7 @@ def create_array(mydict, constraints):
     for i in prod:
         first_arr = np.array([])
         for val in i.values():
-            print("i: ", i)
-            print("val: ", val)
             first_arr = np.append(first_arr, val)
-        print("First arr: ", first_arr)
         if check_constraints(first_arr, mydict, constraints):
             arr.append(list(i.values()))
 
@@ -82,7 +80,6 @@ def count_miss(data, t, mydict):
         for i in range(0, t):
             mult *= len(mydict[('o' + str(p[i]+1)), str(p[i])])
         if (np.unique(data[:, p], axis=0).shape[0] < mult):
-            # if not, return false
             missing_tuples = mult - np.unique(data[:, p], axis=0).shape[0]
             return missing_tuples
     # if we made it through the whole for loop, return true
@@ -91,26 +88,34 @@ def count_miss(data, t, mydict):
 
 def check_constraints(data, mydict, constraints):
     for x in constraints:
-        ind = np.array([])
-        inv_ind = np.array([])
+        ind = []
+        inv_ind = []
         for opt in constraints[x]:
-            i = 0  # For saving the column orders to be keys of conc_dict
+            # i = 0  # For saving the column orders to be keys of conc_dict
             for y in mydict.keys():
-                print("OPT", opt)
                 if len(opt) == 2:  # If the configuration in constraint is an equality condition
-                    conc_dict = np.array([])
-                    not_conc = np.array([])
-                    print("Y0:", y[0])
-                    print("Y1:", y[1])
-                    print("Data0: ", data)
                     if opt[0] == y[0]:
-                        print("Data: ", data[int(y[1])])
-                        ind = np.append(ind, [data[int(y[1])]])
-            print("Cols: ", ind)
+                        ind.append(data[int(y[1])])
+                elif len(opt) == 3:
+                    if opt[0] == y[0]:
+                        ind.append(("!", data[int(y[1])]))
             inv_ind = np.append(inv_ind, opt[1])
-        if ind[0] == inv_ind[0]:
-            if ind[1] != inv_ind[1]:
-                return False
+        if len(ind[0]) == 1 and len(ind[1]) == 1:
+            if ind[0] == inv_ind[0]:
+                if ind[1] != inv_ind[1]:
+                    return False
+        elif len(ind[0]) == 2 and len(ind[1]) == 1:
+            if ind[0][1] != inv_ind[0]:
+                if ind[1] != inv_ind[1]:
+                    return False
+        elif len(ind[0]) == 1 and len(ind[1]) == 2:
+            if ind[0] == inv_ind[0]:
+                if ind[1][1] == inv_ind[1]:
+                    return False
+        elif len(ind[0]) == 2 and len(ind[1]) == 2:
+            if ind[0][1] != inv_ind[0]:
+                if ind[1][1] == inv_ind[1]:
+                    return False
         # if len(ind) == 2:
         #     for k in range(0, len(ind)):
 
@@ -171,14 +176,18 @@ def size_decrease(data):  # Randomly deletes a row in generated array to decreas
 
 
 # Neighboring state generation function which gets the data and alters an option setting value
-def neighboring_state_gen(data, no_opts, mydict, constraints):
+def neighboring_state_gen(data, no_opts, mydict, c_size, constraints):
+    cons = False
     if data.shape[0] == c_size:
         neighbor = data
-        c_row = random.randint(0, data.shape[0]-1)
-        c_col = random.randint(0, no_opts-1)
-        c_c_row = len(mydict[('o'+str(c_col+1)), str(c_col)])
-        neighbor[c_row, c_col] = random.randint(0, c_c_row-1)
-        # print("Data: ", data, "Neighbor: ", neighbor)
+        while cons == False:
+            c_row = random.randint(0, data.shape[0]-1)
+            c_col = random.randint(0, no_opts-1)
+            c_c_row = len(mydict[('o'+str(c_col+1)), str(c_col)])
+            rand_ind = random.randint(0, c_c_row-1)
+            if check_constraints(data[c_row], mydict, constraints):
+                neighbor[c_row, c_col] = rand_ind
+                cons = True
     else:
         neighbor = create_test_array(data, c_size)
     return neighbor
@@ -233,8 +242,6 @@ count = 0
 value_count = 1
 for x in mydict.values():
     value_count *= len(x)
-print(value_count)
-print(mydict['o1', '0'])
 no_opts = len(mydict)
 # no_vals = value_count
 starting_temp = 10
@@ -276,6 +283,7 @@ c_rate = cooling_rate(starting_temp, stopping_temp, t, no_opts)
 temp = starting_temp
 # working_test = create_test_array(test, c_size)
 start = time.time()
+c_size = working_test.shape[0]
 while temp > stopping_temp:
     working_test = create_test_array(working_test, c_size)
     miss = count_miss(working_test, t, mydict)
@@ -284,9 +292,8 @@ while temp > stopping_temp:
         c_size -= 1
         temp = starting_temp
         continue
-    print("heyheyhey", check_constraints(working_test, mydict, arranged_cns))
     neighbor = neighboring_state_gen(
-        working_test, no_opts, mydict, arranged_cns)
+        working_test, no_opts, mydict, c_size, arranged_cns)
     t_miss_n = count_miss(neighbor, t, mydict)
     diff_miss = t_miss_n - miss
     if check_constraints(neighbor, mydict, arranged_cns) == True and (working_test.shape[0] == neighbor.shape[0] or (diff_miss < 0 or (random.randint(0, 1) < (math.e)**((-(scipy.constants.k))*diff_miss/temp)))):

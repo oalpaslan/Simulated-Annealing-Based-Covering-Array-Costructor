@@ -32,7 +32,7 @@
   <OutputParameters />
   <Relations />
   <Constraints>
-    <Constraint text="o1=0 =&gt; o2=1">
+    <Constraint text="o2!=0 =&gt; o3!=1">
       <Parameters>
         <Parameter name="o1" />
         <Parameter name="o2" />
